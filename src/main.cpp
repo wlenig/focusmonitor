@@ -1,6 +1,7 @@
 #include "monitor.hpp"
 #include <Windows.h>
 #include <stdexcept>
+#include <iostream>
 
 /// @brief Creates a named pipe instance
 /// @return Handle to the created named pipe instance
@@ -24,26 +25,32 @@ auto create_instance() -> HANDLE
     return instance;
 }
 
+
 /// @brief Thread function to read from pipe instance
 /// @param instance The named pipe instance to read from
 /// @return 
 auto WINAPI handle_instance(HANDLE instance) -> DWORD
 {
-    // TODO: loop
-    auto buffer = new char[monitor::BUFSIZE];
+    char buffer[monitor::BUFSIZE];
     DWORD read;
+    
+    while (true) {
+        auto success = ReadFile(
+            instance,
+            buffer,
+            sizeof(buffer),
+            &read,
+            NULL
+        );
 
-    auto success = ReadFile(
-        instance,
-        buffer,
-        sizeof(buffer),
-        &read,
-        NULL
-    );
+        if (!success) {
+            break;
+        }
 
-    if (!success) {
-        throw std::runtime_error("Failed to read from named pipe");
+        std::cout << "Read: " << buffer << std::endl;
     }
+
+    return 0;
 }
 
 
@@ -59,14 +66,15 @@ auto accept_client(HANDLE instance) -> HANDLE
     if (!connected) {
         throw std::runtime_error("Failed to connect to named pipe");
     }
-
+    
+    DWORD thread_id;
     auto thread = CreateThread(
         NULL,
         0,
-        (LPTHREAD_START_ROUTINE)handle_instance,
+        handle_instance,
         instance,
         NULL,
-        NULL
+        &thread_id
     );
 
     if (thread == NULL) {
@@ -76,14 +84,33 @@ auto accept_client(HANDLE instance) -> HANDLE
     return thread;
 }
 
-// TODO: Implement monitor dll to house the hook proc
-//       and invoke it from here
+/// @brief Loads monitor module and calls SetWindowsHookEx with the exported CBT procedure
+/// @return 
+auto install_hook()
+{
+    auto monitor_module = LoadLibrary(L"monitor.dll");
+    if (monitor_module == NULL) {
+        throw std::runtime_error("Failed to load monitor module");
+    }
+
+    auto install_proc = (decltype(&monitor::InstallHook))GetProcAddress(monitor_module, "InstallHook");
+    if (!install_proc) {
+        throw std::runtime_error("Failed to find install procedure");
+    }
+
+    return install_proc(monitor_module);
+}
+
 
 int main() {
-    while (true) {
-        auto instance = create_instance();
-        static auto _ = 0;
-        accept_client(instance);
+    try {
+        while (true) {
+            auto instance = create_instance();
+            static auto hook = install_hook();
+            accept_client(instance);
+        }
+    } catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
     }
 }
 
