@@ -50,6 +50,7 @@ auto WINAPI handle_instance(HANDLE instance) -> DWORD
         std::cout << "Read: " << buffer << std::endl;
     }
 
+    CloseHandle(instance);
     return 0;
 }
 
@@ -57,7 +58,7 @@ auto WINAPI handle_instance(HANDLE instance) -> DWORD
 /// @brief Waits for a client on the named pipe, then creates a thread to handle the client
 /// @param instance 
 /// @return Created thread handle
-auto accept_client(HANDLE instance) -> HANDLE
+auto accept_client(HANDLE instance) -> void
 {
     auto connected = ConnectNamedPipe(instance, NULL)
         ? TRUE
@@ -81,7 +82,7 @@ auto accept_client(HANDLE instance) -> HANDLE
         throw std::runtime_error("Failed to create thread");
     }
 
-    return thread;
+    CloseHandle(thread);
 }
 
 /// @brief Loads monitor module and calls SetWindowsHookEx with the exported CBT procedure
