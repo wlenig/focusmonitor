@@ -2,7 +2,6 @@
 #include <Windows.h>
 #include <stdexcept>
 
-HHOOK hook;
 
 auto pipe_setup()
 {
@@ -34,28 +33,29 @@ auto pipe_close(HANDLE pipe)
 }
 
 
-auto pipe_write(HANDLE pipe, const char* msg)
+auto pipe_write(HANDLE pipe, void* msg, size_t size)
 {
     DWORD written;
     return WriteFile(
         pipe,
         msg,
-        strlen(msg),
+        size,
         &written,
         NULL
     );
 }
 
 
-auto write_name() -> void
+auto write_event(HWND focused) -> void
 {
     auto pipe = pipe_setup();
  
-    char name[MAX_PATH];
-    GetModuleFileNameA(NULL, name, sizeof(name));
-    name[MAX_PATH - 1] = '\0';
+    auto event = monitor::FocusEvent{};
+    GetModuleFileNameA(NULL, event.executable, sizeof(event.executable));
+    GetWindowTextA(focused, event.window_name, sizeof(event.window_name));
+    event.process_id = GetCurrentProcessId();
 
-    pipe_write(pipe, name);
+    pipe_write(pipe, &event, sizeof(event));
     pipe_close(pipe);
 }
 
@@ -65,11 +65,14 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(
   WPARAM wParam,
   LPARAM lParam
 ) {
+    // wParam is handle to window gaining focus
+    // lParam is handle to window losing focus
+
     if (nCode == HCBT_SETFOCUS) {
         // TODO: evaluate the current cost of opening a pipe on demand
         //       versus the trade off of opening many pipe instances
         //       (i.e. one per process)
-        write_name();
+        write_event((HWND)wParam);
     }
 
     return CallNextHookEx(NULL, nCode, wParam, lParam);

@@ -2,6 +2,9 @@
 #include <Windows.h>
 #include <stdexcept>
 #include <iostream>
+#include <iomanip>
+#include <ctime>
+#include <mutex>
 
 /// @brief Creates a named pipe instance
 /// @return Handle to the created named pipe instance
@@ -26,28 +29,70 @@ auto create_instance() -> HANDLE
 }
 
 
+auto get_current_time()
+{
+    auto now = std::time(nullptr);
+    auto local = std::localtime(&now);
+
+    char buffer[8 + 1]; // strlen(HH:MM:SS) = 8
+    std::strftime(buffer, sizeof(buffer), "%H:%M:%S", local);
+
+    return std::string(buffer);
+}
+
+
+auto log_focus_event(monitor::FocusEvent event)
+{
+    // TODO: separate logging logic more cleanly
+
+    // Get console handle for changing color
+    auto console = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (console == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("Unable to get handle to console");
+    }
+
+    // Convenience console color setter
+    auto set_color = [&console](auto color) {
+        SetConsoleTextAttribute(console, color);
+    };
+
+    // this is how this API was designed???
+    constexpr auto WHITE = FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN;
+    constexpr auto GRAY = FOREGROUND_INTENSITY;
+
+    // Create mutex once, enter guard to prevent console overlap
+    static std::mutex log_mutex;
+    std::lock_guard<std::mutex> guard(log_mutex);
+
+    std::cout << '[' << get_current_time() << "] " << event.executable << std::endl;
+    set_color(GRAY);
+    std::cout << std::setfill('-') << std::setw(6) << " Window: " << event.window_name << std::endl;
+    std::cout << std::setfill('-') << std::setw(6) << " PID: " << event.process_id << std::endl;
+    set_color(WHITE);
+}
+
+
 /// @brief Thread function to read from pipe instance
 /// @param instance The named pipe instance to read from
 /// @return 
 auto WINAPI handle_instance(HANDLE instance) -> DWORD
 {
-    char buffer[monitor::BUFSIZE];
+    // char buffer[monitor::BUFSIZE];
+    auto event = monitor::FocusEvent{};
     DWORD read;
     
     while (true) {
-        auto success = ReadFile(
+        if (ReadFile(
             instance,
-            buffer,
-            sizeof(buffer),
+            &event,
+            sizeof(event),
             &read,
             NULL
-        );
-
-        if (!success) {
+        )) {
+            log_focus_event(event);
+        } else {
             break;
         }
-
-        std::cout << "Read: " << buffer << std::endl;
     }
 
     CloseHandle(instance);
@@ -104,6 +149,11 @@ auto install_hook()
 
 
 int main() {
+    // Creates a named pipe instance, installs hook __once__ (see: static), then waits for a client to connect.
+    // Clients connect, a thread is spawned to read their transmitted FocusEvent, before closing.
+    // Loops the behavior to continually receieve new FocusEvents
+    // TODO: Consider reusing instances rather than spawning new ones and closing old ones; is there a performance benefit?
+
     try {
         while (true) {
             auto instance = create_instance();
