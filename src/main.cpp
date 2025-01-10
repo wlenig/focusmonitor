@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <ctime>
 #include <mutex>
+#include <sstream>
 
 /// @brief Creates a named pipe instance
 /// @return Handle to the created named pipe instance
@@ -34,7 +35,7 @@ auto get_current_time()
     auto now = std::time(nullptr);
     auto local = std::localtime(&now);
 
-    char buffer[8 + 1]; // strlen(HH:MM:SS) = 8
+    char buffer[8 + 1]; // strlen("HH:MM:SS") = 8
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", local);
 
     return std::string(buffer);
@@ -43,8 +44,6 @@ auto get_current_time()
 
 auto log_focus_event(monitor::FocusEvent event)
 {
-    // TODO: separate logging logic more cleanly
-
     // Get console handle for changing color
     auto console = GetStdHandle(STD_OUTPUT_HANDLE);
     if (console == INVALID_HANDLE_VALUE) {
@@ -60,14 +59,17 @@ auto log_focus_event(monitor::FocusEvent event)
     constexpr auto WHITE = FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN;
     constexpr auto GRAY = FOREGROUND_INTENSITY;
 
-    // Create mutex once, enter guard to prevent console overlap
-    static std::mutex log_mutex;
-    std::lock_guard<std::mutex> guard(log_mutex);
+    // Lock to prevent interleaved output
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
 
-    std::cout << '[' << get_current_time() << "] " << event.executable << std::endl;
+    auto time = get_current_time();
+    
+    std::cout << "[" << time << "] Focus changed" << std::endl;
     set_color(GRAY);
-    std::cout << std::setfill('-') << std::setw(6) << " Window: " << event.window_name << std::endl;
-    std::cout << std::setfill('-') << std::setw(6) << " PID: " << event.process_id << std::endl;
+    std::cout << std::right << std::setw(16) << "Process ID : " << event.process_id << std::endl;
+    std::cout << std::right << std::setw(16) << "Executable : " << event.executable << std::endl;
+    std::cout << std::right << std::setw(16) << "Window : " << event.window_name << std::endl;
     set_color(WHITE);
 }
 
@@ -77,18 +79,19 @@ auto log_focus_event(monitor::FocusEvent event)
 /// @return 
 auto WINAPI handle_instance(HANDLE instance) -> DWORD
 {
-    // char buffer[monitor::BUFSIZE];
     auto event = monitor::FocusEvent{};
     DWORD read;
     
     while (true) {
-        if (ReadFile(
+        auto success = ReadFile(
             instance,
             &event,
             sizeof(event),
             &read,
             NULL
-        )) {
+        );
+
+        if (success) {
             log_focus_event(event);
         } else {
             break;
@@ -101,8 +104,7 @@ auto WINAPI handle_instance(HANDLE instance) -> DWORD
 
 
 /// @brief Waits for a client on the named pipe, then creates a thread to handle the client
-/// @param instance 
-/// @return Created thread handle
+/// @param instance The named pipe instance to accept a client on
 auto accept_client(HANDLE instance) -> void
 {
     auto connected = ConnectNamedPipe(instance, NULL)
@@ -131,7 +133,7 @@ auto accept_client(HANDLE instance) -> void
 }
 
 /// @brief Loads monitor module and calls SetWindowsHookEx with the exported CBT procedure
-/// @return 
+/// @return Whether the hook was successfully installed
 auto install_hook() -> HHOOK
 {
     auto monitor_module = LoadLibrary(L"monitor.dll");
