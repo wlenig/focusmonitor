@@ -34,7 +34,7 @@ auto get_current_time()
     auto now = std::time(nullptr);
     auto local = std::localtime(&now);
 
-    char buffer[8 + 1]; // strlen(HH:MM:SS) = 8
+    char buffer[8 + 1]; // strlen("HH:MM:SS") = 8
     std::strftime(buffer, sizeof(buffer), "%H:%M:%S", local);
 
     return std::string(buffer);
@@ -77,7 +77,6 @@ auto log_focus_event(monitor::FocusEvent event)
 /// @return 
 auto WINAPI handle_instance(HANDLE instance) -> DWORD
 {
-    // char buffer[monitor::BUFSIZE];
     auto event = monitor::FocusEvent{};
     DWORD read;
     
@@ -101,8 +100,7 @@ auto WINAPI handle_instance(HANDLE instance) -> DWORD
 
 
 /// @brief Waits for a client on the named pipe, then creates a thread to handle the client
-/// @param instance 
-/// @return Created thread handle
+/// @param instance The named pipe instance to accept a client on
 auto accept_client(HANDLE instance) -> void
 {
     auto connected = ConnectNamedPipe(instance, NULL)
@@ -131,7 +129,7 @@ auto accept_client(HANDLE instance) -> void
 }
 
 /// @brief Loads monitor module and calls SetWindowsHookEx with the exported CBT procedure
-/// @return 
+/// @return Whether the hook was successfully installed
 auto install_hook()
 {
     auto monitor_module = LoadLibrary(L"monitor.dll");
