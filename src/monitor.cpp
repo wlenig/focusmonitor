@@ -15,14 +15,6 @@ auto pipe_setup()
         NULL
     );
 
-    DWORD mode = PIPE_READMODE_MESSAGE;
-    SetNamedPipeHandleState(
-        pipe,
-        &mode,
-        NULL,
-        NULL
-    );
-
     return pipe;
 }
 
@@ -45,7 +37,7 @@ auto pipe_write(HANDLE pipe, void* msg, size_t size)
     );
 }
 
-
+ 
 auto write_event(HWND focused) -> void
 {
     auto pipe = pipe_setup();
