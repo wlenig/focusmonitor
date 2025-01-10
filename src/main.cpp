@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <ctime>
 #include <mutex>
+#include <sstream>
 
 /// @brief Creates a named pipe instance
 /// @return Handle to the created named pipe instance
@@ -43,8 +44,6 @@ auto get_current_time()
 
 auto log_focus_event(monitor::FocusEvent event)
 {
-    // TODO: separate logging logic more cleanly
-
     // Get console handle for changing color
     auto console = GetStdHandle(STD_OUTPUT_HANDLE);
     if (console == INVALID_HANDLE_VALUE) {
@@ -60,14 +59,17 @@ auto log_focus_event(monitor::FocusEvent event)
     constexpr auto WHITE = FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN;
     constexpr auto GRAY = FOREGROUND_INTENSITY;
 
-    // Create mutex once, enter guard to prevent console overlap
-    static std::mutex log_mutex;
-    std::lock_guard<std::mutex> guard(log_mutex);
+    // Lock to prevent interleaved output
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
 
-    std::cout << '[' << get_current_time() << "] " << event.executable << std::endl;
+    auto time = get_current_time();
+    
+    std::cout << "[" << time << "] Focus changed" << std::endl;
     set_color(GRAY);
-    std::cout << std::setfill('-') << std::setw(6) << " Window: " << event.window_name << std::endl;
-    std::cout << std::setfill('-') << std::setw(6) << " PID: " << event.process_id << std::endl;
+    std::cout << std::right << std::setw(16) << "Process ID : " << event.process_id << std::endl;
+    std::cout << std::right << std::setw(16) << "Executable : " << event.executable << std::endl;
+    std::cout << std::right << std::setw(16) << "Window : " << event.window_name << std::endl;
     set_color(WHITE);
 }
 
@@ -81,13 +83,15 @@ auto WINAPI handle_instance(HANDLE instance) -> DWORD
     DWORD read;
     
     while (true) {
-        if (ReadFile(
+        auto success = ReadFile(
             instance,
             &event,
             sizeof(event),
             &read,
             NULL
-        )) {
+        );
+
+        if (success) {
             log_focus_event(event);
         } else {
             break;
