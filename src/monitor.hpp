@@ -11,7 +11,5 @@ namespace monitor
         char window_name[MAX_PATH];
         DWORD process_id;
     };
-
-    extern "C" __declspec(dllexport) auto InstallHook(HINSTANCE self) -> bool;
 }
 

@@ -48,13 +48,12 @@ auto pipe_write(HANDLE pipe, void* msg, size_t size)
 
 auto write_event(HWND focused) -> void
 {
-    auto pipe = pipe_setup();
- 
     auto event = monitor::FocusEvent{};
     GetModuleFileNameA(NULL, event.executable, sizeof(event.executable));
     GetWindowTextA(focused, event.window_name, sizeof(event.window_name));
     event.process_id = GetCurrentProcessId();
 
+    auto pipe = pipe_setup();
     pipe_write(pipe, &event, sizeof(event));
     pipe_close(pipe);
 }
@@ -76,9 +75,4 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(
     }
 
     return CallNextHookEx(NULL, nCode, wParam, lParam);
-}
-
-extern "C" __declspec(dllexport) auto monitor::InstallHook(HINSTANCE self) -> bool
-{
-    return SetWindowsHookEx(WH_CBT, CBTProc, self, 0) != NULL;
 }

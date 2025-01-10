@@ -132,19 +132,19 @@ auto accept_client(HANDLE instance) -> void
 
 /// @brief Loads monitor module and calls SetWindowsHookEx with the exported CBT procedure
 /// @return 
-auto install_hook()
+auto install_hook() -> HHOOK
 {
     auto monitor_module = LoadLibrary(L"monitor.dll");
     if (monitor_module == NULL) {
         throw std::runtime_error("Failed to load monitor module");
     }
 
-    auto install_proc = (decltype(&monitor::InstallHook))GetProcAddress(monitor_module, "InstallHook");
-    if (!install_proc) {
-        throw std::runtime_error("Failed to find install procedure");
+    auto cbt_proc = (HOOKPROC)GetProcAddress(monitor_module, "CBTProc");
+    if (!cbt_proc) {
+        throw std::runtime_error("Failed to find callback function");
     }
 
-    return install_proc(monitor_module);
+    return SetWindowsHookEx(WH_CBT, cbt_proc, monitor_module, 0);
 }
 
 
