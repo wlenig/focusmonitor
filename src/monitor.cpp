@@ -1,70 +1,43 @@
-#include "monitor.hpp"
 #include <Windows.h>
 #include <stdexcept>
+#include <iostream>
 
-
-auto pipe_setup()
-{
-    auto pipe = CreateFile(
-        monitor::PIPE_NAME,
-        GENERIC_READ | GENERIC_WRITE,
-        0,
-        NULL,
-        OPEN_EXISTING,
-        0,
-        NULL
-    );
-
-    return pipe;
-}
-
-
-auto pipe_close(HANDLE pipe)
-{
-    return CloseHandle(pipe);
-}
-
-
-auto pipe_write(HANDLE pipe, void* msg, size_t size)
-{
-    DWORD written;
-    return WriteFile(
-        pipe,
-        msg,
-        size,
-        &written,
-        NULL
-    );
-}
-
- 
-auto write_event(HWND focused) -> void
-{
-    auto event = monitor::FocusEvent{};
-    GetModuleFileNameA(NULL, event.executable, sizeof(event.executable));
-    GetWindowTextA(focused, event.window_name, sizeof(event.window_name));
-    event.process_id = GetCurrentProcessId();
-
-    auto pipe = pipe_setup();
-    pipe_write(pipe, &event, sizeof(event));
-    pipe_close(pipe);
-}
-
-
-extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(
-  int    nCode,
-  WPARAM wParam,
-  LPARAM lParam
+void handle_event(
+    HWINEVENTHOOK hWinEventHook,
+    DWORD event,
+    HWND hwnd,
+    LONG idObject,
+    LONG idChild,
+    DWORD idEventThread,
+    DWORD dwmsEventTime
 ) {
-    // wParam is handle to window gaining focus
-    // lParam is handle to window losing focus
+    std::cout << hwnd << std::endl;
+}
 
-    if (nCode == HCBT_SETFOCUS) {
-        // TODO: evaluate the current cost of opening a pipe on demand
-        //       versus the trade off of opening many pipe instances
-        //       (i.e. one per process)
-        write_event((HWND)wParam);
+void message_loop()
+{
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+}
+
+int main()
+{
+    auto hook = SetWinEventHook(
+        EVENT_OBJECT_FOCUS, EVENT_OBJECT_FOCUS,
+        NULL,
+        handle_event,
+        0,
+        0,
+        WINEVENT_OUTOFCONTEXT
+    );
+
+    if (!hook) {
+        throw std::runtime_error("Failed to set event hook");
     }
 
-    return CallNextHookEx(NULL, nCode, wParam, lParam);
+    message_loop();
+    UnhookWinEvent(hook);
 }
