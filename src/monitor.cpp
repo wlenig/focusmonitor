@@ -9,16 +9,16 @@ struct FocusInfo {
     HWND window;
     DWORD process_id;
     char executable_file[MAX_PATH];
+    unsigned executable_name_offset;
     char window_name[MAX_PATH];
-    const char* executable_name;
 };
 
 auto get_info(HWND hwnd)
 {
     FocusInfo info{};
+    info.window = hwnd;
     info.executable_file[0] = '\0';
     info.window_name[0] = '\0';
-    info.executable_name = "";
 
     if (!GetWindowThreadProcessId(hwnd, &info.process_id)) {
         throw std::runtime_error("Failed to get process ID");
@@ -34,8 +34,8 @@ auto get_info(HWND hwnd)
         throw std::runtime_error("Failed to get executable name");
     }
 
-    // Get short file name
-    info.executable_name = PathFindFileNameA(info.executable_file);
+    // Get short file name as offset from the entire path
+    info.executable_name_offset = PathFindFileNameA(info.executable_file) - info.executable_file;
 
     // Get window title name. Note: not all windows have title names, so we don't check return
     GetWindowTextA(hwnd, info.window_name, sizeof(info.window_name));
@@ -59,7 +59,7 @@ auto log_info(FocusInfo info)
 {
     auto time_str = get_current_time();
 
-    std::cout << "[" << time_str << "] " << info.executable_name << std::endl;
+    std::cout << "[" << time_str << "] " << &info.executable_file[info.executable_name_offset] << std::endl;
     std::cout << std::setw(16) << std::right << "Process ID : " << info.process_id << std::endl;
     std::cout << std::setw(16) << std::right << "Window title : " << info.window_name << std::endl;
     std::cout << std::setw(16) << std::right << "Executable : " << info.executable_file << std::endl;
