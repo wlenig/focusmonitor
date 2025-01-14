@@ -9,6 +9,3 @@ Building requires MSVC. Open Visual Studio Developer Console and run `make.bat`;
 ### Usage
 
 Build, then run `bin/main.exe`. In the future, portable builds will be provided.
-
-> [!WARNING]
-> FocusMonitor uses SetWindowsHookEx and loads an unsigned DLL into running processes. Neither anti-cheats nor anti-viruses take kindly to such behavior, so exercise caution with the already running processes on your computer.
