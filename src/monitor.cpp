@@ -91,7 +91,6 @@ void message_loop()
 int main()
 {
     try {
-
         auto hook = SetWinEventHook(
             EVENT_OBJECT_FOCUS, EVENT_OBJECT_FOCUS,
             NULL,
