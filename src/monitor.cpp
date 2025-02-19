@@ -4,18 +4,12 @@
 #include <iomanip>
 #include <Psapi.h>
 #include <Shlwapi.h>
+#include "monitor.hpp"
 
-struct FocusInfo {
-    HWND window;
-    DWORD process_id;
-    char executable_file[MAX_PATH];
-    unsigned executable_name_offset;
-    char window_name[MAX_PATH];
-};
 
 auto get_info(HWND hwnd)
 {
-    FocusInfo info{};
+    monitor::FocusInfo info{};
     info.window = hwnd;
     info.executable_file[0] = '\0';
     info.window_name[0] = '\0';
@@ -55,7 +49,7 @@ auto get_current_time()
     return std::string(buffer);
 }
 
-auto log_info(FocusInfo info)
+auto log_info(monitor::FocusInfo info)
 {
     auto time_str = get_current_time();
 

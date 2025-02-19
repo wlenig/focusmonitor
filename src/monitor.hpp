@@ -2,7 +2,12 @@
 
 namespace monitor
 {
-    constexpr auto PIPE_NAME = L"\\\\.\\pipe\\FocusMonitorPipe";
-    constexpr auto BUFSIZE = 256;
+    struct FocusInfo {
+        HWND window;
+        DWORD process_id;
+        char executable_file[MAX_PATH];
+        unsigned executable_name_offset;
+        char window_name[MAX_PATH];
+    };
 }
 
